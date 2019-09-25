@@ -24,6 +24,9 @@ import argparse
 import xml.sax
 import collections
 import numpy as np
+from xml.dom import minidom
+
+doc = minidom.Document()
 
 YahooAnswerRecParsed = collections.namedtuple('YahooAnswerRecParsed',
                                               'uri subject content' +
@@ -190,12 +193,25 @@ class Worker:
         print('Sampling %d out of %d questions' %
               (self.query_sample_qty, query_qty))
         query_indx = np.random.choice(np.arange(query_qty),
-                                      self.query_sample_qty)
-        with open(os.path.join(self.output_folder, 'queries.tsv'), 'w') as f:
-            for i in query_indx:
-                f.write('%s\t%s\n' %
-                        (self.questions[i][1],
-                         self.questions[i][0]))
+                                      self.query_sample_qty,
+                                      replace=False)
+        doc = minidom.Document()
+
+        root = doc.createElement('yahoo_answers')
+        doc.appendChild(root)
+
+        for i in query_indx:
+            topic = doc.createElement('topic')
+            topic.setAttribute('number', self.questions[i][0])
+            queryText = doc.createElement('query')
+            queryText.appendChild(doc.createTextNode(self.questions[i][1]))
+
+            root.appendChild(topic)
+            topic.appendChild(queryText)
+
+        with open(os.path.join(self.output_folder, 'queries.xml'), 'w') as f:
+            f.write(doc.toprettyxml(indent='    '))
+
         with open(os.path.join(self.output_folder, 'qrels.tsv'), 'w') as f:
             for i in query_indx:
                 qid = self.questions[i][0]
@@ -223,7 +239,7 @@ if __name__ == '__main__':
     parser.add_argument('--collection_path', required=True,
                         help='Yahoo Answers file')
     parser.add_argument('--output_folder', required=True, help='output file')
-    parser.add_argument('--random_seed', default=0, type=float,
+    parser.add_argument('--random_seed', default=0, type=int,
                         help='random seed')
     parser.add_argument('--query_sample_qty', type=int, required=True,
                         help='# of queries to sample')
